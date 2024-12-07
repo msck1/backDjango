@@ -1,51 +1,30 @@
-from django.shortcuts import render, redirect
-from django.contrib import messages
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
 from .models import Usuarios
-from .forms import UsuarioForm, LoginForm
+from .serializers import UserSerializer
 
-# Create your views here.
+@api_view(['POST'])
+def register_user(request):
+    serializer = UserSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response({'message': 'User registered successfully'}, status=201)
+    return Response(serializer.errors, status=400)
 
+@api_view(['POST'])
+def login_user(request):
+    email = request.data.get('email')
+    senha = request.data.get('senha')
 
-def listar_usuarios(request):
-    if 'usuario_logado' not in request.session:
-        return redirect('login')
-    
-    usuarios = Usuarios.objects.all()
-    return render(request, 'listar.html', {'usuarios': usuarios})
+    try:
+        usuario = Usuarios.objects.get(email=email)
+        if usuario.senha == senha:
+            return Response({'message': 'Login successful', 'user_id': usuario.id})
+        else:
+            return Response({'error': 'Invalid password'}, status=401)
+    except Usuarios.DoesNotExist:
+        return Response({'error': 'User not found'}, status=404)
 
-def cadastrar_usuario(request):
-    if request.method == 'POST':
-        form = UsuarioForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Usuário cadastrado com sucesso!')
-            return redirect('listar_usuarios')
-    else:
-        form = UsuarioForm()
-    return render(request, 'cadastrar.html', {'form': form})
-
-def login(request):
-    if request.method == 'POST':
-        form = LoginForm(request.POST)
-        if form.is_valid():
-            email = form.cleaned_data['email']
-            senha = form.cleaned_data['senha']
-            
-            try:
-                usuario = Usuarios.objects.get(email=email)
-                if usuario.senha == senha:
-                    # Login bem-sucedido
-                    request.session['usuario_logado'] = usuario.id
-                    return redirect('listar_usuarios')
-                else:
-                    messages.error(request, 'Senha incorreta')
-            except Usuarios.DoesNotExist:
-                messages.error(request, 'Usuário não encontrado')
-    else:
-        form = LoginForm()
-    return render(request, 'login.html', {'form': form})
-
-def logout(request):
-    if 'usuario_logado' in request.session:
-        del request.session['usuario_logado']
-    return redirect('login')
+@api_view(['POST'])
+def logout_user(request):
+    return Response({'message': 'Logout successful'})
